@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://cigarettes-led-proceed-approval.trycloudflare.com";
+
 const SCRIPT_PRESETS: Record<string, string> = {
   hello: "from mpi4py import MPI\ncomm = MPI.COMM_WORLD\nprint(f'Hello from rank {comm.Get_rank()} of {comm.Get_size()}')",
   pi: "from mpi4py import MPI\nimport random\n\ncomm = MPI.COMM_WORLD\nrank = comm.Get_rank()\nsize = comm.Get_size()\nN = 500000\n\ninside = sum(1 for _ in range(N // size) if random.random()**2 + random.random()**2 <= 1.0)\ntotal_inside = comm.reduce(inside, op=MPI.SUM, root=0)\n\nif rank == 0:\n    pi = 4.0 * total_inside / N\n    print(f'Monte Carlo Pi estimation across {size} ranks: {pi}')",
-  prime: "from mpi4py import MPI\n\ncomm = MPI.COMM_WORLD\nrank = comm.Get_rank()\nsize = comm.Get_size()\n\ndef is_prime(n):\n    return n > 1 and all(n % i != 0 for i in range(2, int(n**0.5) + 1))\n\nlimit = 200\nprimes = [n for n in range(2 + rank, limit, size) if is_prime(n)]\nall_primes = comm.gather(primes, root=0)\n\nif rank == 0:\n    flat = sorted([p for sub in all_primes for p in sub])\n    print(f'Parallel Prime Sieve up to {limit}: {flat}')"
+  prime: "from mpi4py import MPI\n\ncomm = MPI.COMM_WORLD\nrank = comm.Get_rank()\nsize = comm.Get_size()\n\ndef is_prime(n):\n    return n > 1 and all(n % i != 0 for i in range(2, int(n**0.5) + 1))\n\nlimit = 200\nprimes = [n for n in range(2 + rank, limit, size) if is_prime(n)]\nall_primes = comm.gather(primes, root=0)\n\nif rank == 0:\n    flat = sorted([p for sub in all_primes for p in sub])\n    print(f'Parallel Prime Sieve up to {limit}: {flat}')",
+  matrix: "from mpi4py import MPI\nimport numpy as np\n\ncomm = MPI.COMM_WORLD\nrank = comm.Get_rank()\nsize = comm.Get_size()\nN = 100\n\nif N % size != 0:\n    if rank == 0:\n        print(f'Error: Matrix dimension ({N}) must be divisible by ranks ({size}).')\n    exit(1)\n\nrows_per_rank = N // size\nif rank == 0:\n    A = np.random.randint(1, 10, size=(N, N))\n    B = np.random.randint(1, 10, size=(N, N))\n    print(f'Matrix Multiplication ({N}x{N}) starting across {size} MPI ranks...')\nelse:\n    A = None\n    B = np.empty((N, N), dtype=int)\n\nlocal_A = np.empty((rows_per_rank, N), dtype=int)\ncomm.Scatter(A, local_A, root=0)\ncomm.Bcast(B, root=0)\nlocal_C = np.dot(local_A, B)\n\nC = np.empty((N, N), dtype=int) if rank == 0 else None\ncomm.Gather(local_C, C, root=0)\n\nif rank == 0:\n    print(f'Parallel Matrix Multiplication Completed Successfully!')\n    print(f'Result Matrix C shape: {C.shape}')\n    print(f'Sample Sub-matrix (Top 3x3):\\n{C[:3, :3]}')"
 };
 
 export default function Dashboard() {
@@ -117,9 +119,22 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-blue-400">OpenNebula HPC Portal</h1>
           <p className="text-slate-400 text-sm">CSC 4812 Distributed Infrastructure</p>
         </div>
-        <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-sm font-mono">
-          <span className="text-slate-400">Master Load: </span>
-          <span className="text-emerald-400">{sysLoad}</span>
+        <div className="flex items-center space-x-4">
+          <a 
+            href="http://192.168.1.10:9869" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg border border-slate-700 text-xs text-blue-400 font-semibold transition flex items-center space-x-1"
+          >
+            <span>OpenNebula Sunstone UI</span>
+            <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-0L10 14" />
+            </svg>
+          </a>
+          <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-sm font-mono">
+            <span className="text-slate-400">Master Load: </span>
+            <span className={sysLoad === "Offline" ? "text-red-400" : "text-emerald-400"}>{sysLoad}</span>
+          </div>
         </div>
       </div>
 
@@ -159,6 +174,7 @@ export default function Dashboard() {
                 <option value="hello">Hello Ranks</option>
                 <option value="pi">Monte Carlo Pi Estimation</option>
                 <option value="prime">Parallel Prime Sieve</option>
+                <option value="matrix">Matrix Multiplication</option>
               </select>
             </div>
             <div className="flex items-center space-x-2">
@@ -167,7 +183,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <textarea rows={5} value={jobCode} onChange={e => setJobCode(e.target.value)} className="w-full p-3 bg-slate-950 font-mono text-xs text-emerald-300 rounded border border-slate-700 outline-none"/>
+        <textarea rows={6} value={jobCode} onChange={e => setJobCode(e.target.value)} className="w-full p-3 bg-slate-950 font-mono text-xs text-emerald-300 rounded border border-slate-700 outline-none"/>
         <button disabled={loading} onClick={submitJob} className="bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded font-bold transition text-sm">Dispatch Job</button>
         {jobOutput && (
           <pre className="p-4 bg-slate-950 rounded border border-slate-700 font-mono text-xs text-slate-300 overflow-x-auto whitespace-pre-wrap">{jobOutput}</pre>
