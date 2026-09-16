@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://cigarettes-led-proceed-approval.trycloudflare.com";
-
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://supervisors-licence-sized-dept.trycloudflare.com";
 const SCRIPT_PRESETS: Record<string, string> = {
   hello: "from mpi4py import MPI\ncomm = MPI.COMM_WORLD\nprint(f'Hello from rank {comm.Get_rank()} of {comm.Get_size()}')",
   pi: "from mpi4py import MPI\nimport random\n\ncomm = MPI.COMM_WORLD\nrank = comm.Get_rank()\nsize = comm.Get_size()\nN = 500000\n\ninside = sum(1 for _ in range(N // size) if random.random()**2 + random.random()**2 <= 1.0)\ntotal_inside = comm.reduce(inside, op=MPI.SUM, root=0)\n\nif rank == 0:\n    pi = 4.0 * total_inside / N\n    print(f'Monte Carlo Pi estimation across {size} ranks: {pi}')",
